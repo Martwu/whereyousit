@@ -2,7 +2,6 @@
 # -*- coding:UTF8 -*-
 #File:			seatchose.py
 #Create Date:	2013年05月09日 星期四 14时15分48秒
-# 2013年8月1日 改写
 #当天抽电影座位票
 
 import random
@@ -15,8 +14,29 @@ class JustError(Exception):
     def __init__(self):
         Exception.__init__(self, 'May not let all pairs sit together.')
 
+# 获取表达式string，返回None或者表达式list，列表元素tuple *
+def _get_expr(str = None):
+    if str is None:
+        return None
+    else:
+        regex = re.compile('^\d+(\*\d+)?(\+\d+(\*\d+)?)*$')
+        if regex.match(str) is None:
+            print "表达式不符合要求。例子：8*3+5"
+            exit(1)
+        else:
+            splited_list = str.split('+')
+            lenoflist = len(splited_list)
+            for i in range(lenoflist):
+                tmpstr = splited_list.pop(0)
+                if '*' in tmpstr:
+                    tmplist = tmpstr.split('*')
+                    splited_list.append((int(tmplist[0]), int(tmplist[1])))
+                else:
+                    splited_list.append((int(tmpstr), 1))
+    return splited_list
 
-# 获取表达式string，返回None或者座位分布结构list，列表元素tuple *
+
+# 获取表达式string，返回None或者座位分布结构list，列表元素tuple 
 def _get_expr_sturct(_str = None):
     if _str is None:
         splited_list = None
@@ -47,7 +67,6 @@ def _get_expr_sturct(_str = None):
                     exit(1)
                 splited_list.append((line, row))
     return splited_list
-
 
 
 # 获取表达式list和成员名单list，返回排序好的座位顺序list
@@ -98,7 +117,7 @@ def _make_seat_list(members, expr):
     return members_list
 
 
-#获取 表达式list，返回打印格式模板string *
+#获取 表达式list，返回打印格式模板string
 def _get_template(_str = None):
     if _str is not None:
         seat_no = 0
@@ -124,7 +143,7 @@ def _get_template(_str = None):
                     line0 = int(tmpline[0])
                 else:
                     line1 = int(tmpi[1]) + 1
-                    line0 = int(tmpi[0])
+                    line0 = int(tmpi[1])
                 for row in range(row0, row1):
                     for line in range(line0, line1):
                         print_template = print_template + str(row) + '.' + \
@@ -139,7 +158,7 @@ def _get_template(_str = None):
     return print_template
 
 
-# 从json文件中获取报名表 *
+# 从json文件或者__url中获取报名表
 def _get_members(filename):
     try:
         file = open(filename)
@@ -161,20 +180,24 @@ def _get_members(filename):
                 except ValueError:
                     print '"',tmp,'"填写不符合要求，跳过统计。'
                 except IndexError:
-                    print '"',tmp,'"填写不符合要求，跳过统计。'
+                    match = re.match(u'([^\d]+)(\d+)', tmp)
+                    if match is not None:
+                        for j in range(int(match.group(2))):
+                            seed.append(match.group(1))
+                        allmember.append(seed)
+                        print '"', tmp, '"填写不符合要求，计入统计，并鄙视一下。'
+                    else:
+                        print '"',tmp,'"填写不符合要求，跳过统计。'
                 else:
                     try:
                         int(thegroup[2])
                     except:
-                        for j in range(number):
+                        for k in range(number):
                             seed.append(thegroup[0])
                         allmember.append(seed)
                     else:
                         print '"',tmp,'"填写不符合要求，跳过统计。'
-                        
         return allmember
-
-
 
 
 if __name__ == '__main__':
