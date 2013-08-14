@@ -7,6 +7,12 @@
 import random
 import sys, os
 import re 
+import json
+
+# 将环境编码强制设定为utf-8
+reload(sys)
+sys.setdefaultencoding('utf8')  
+
 
 # 自搞一个小异常，主要是在函数 _make_seat_list 中用一下，用以提醒一下
 # 可能存在无法实现全部家属坐一起的情况，但是现在的处理还不是很好
@@ -14,17 +20,22 @@ class JustError(Exception):
     def __init__(self):
         Exception.__init__(self, 'May not let all pairs sit together.')
 
-# 获取表达式string，返回None或者表达式list，列表元素tuple *
+# 获取表达式string，返回None或者表达式list，列表元素tuple 
 def _get_expr(str = None):
     if str is None:
+        # 如果传入为空，返回空，这很公平啊！
         return None
     else:
+        # 表达式用正则匹配，形如 8*3+5
+        splited_list = []
         regex = re.compile('^\d+(\*\d+)?(\+\d+(\*\d+)?)*$')
         if regex.match(str) is None:
             print "表达式不符合要求。例子：8*3+5"
             exit(1)
         else:
+            # 加号分割单位
             splited_list = str.split('+')
+            # 逐个单位，转换成 二元tuple，没有乘号的添加乘数1
             lenoflist = len(splited_list)
             for i in range(lenoflist):
                 tmpstr = splited_list.pop(0)
@@ -33,22 +44,27 @@ def _get_expr(str = None):
                     splited_list.append((int(tmplist[0]), int(tmplist[1])))
                 else:
                     splited_list.append((int(tmpstr), 1))
+    # 在这返回就形如[(,),(,),..]的列表
     return splited_list
 
 
 # 获取表达式string，返回None或者座位分布结构list，列表元素tuple 
 def _get_expr_sturct(_str = None):
     if _str is None:
+        # 如果传入为空，返回空，这很公平啊！
         splited_list = None
     else:
+        # 用正则来匹配表达式，形如 "8-9:1-2 10:3" 
         splited_list = []
         regex = re.compile('^(\d+(-\d+)?:\d+(-\d+)? ?)+$')
         if regex.match(_str) is None:
             print '表达式不符合要求。例子： 行号:序号-序号[空格]行号:……'
             exit(1)
         else:
+            # 用空格分割单位
             tmplist = _str.split(' ')
             for i in tmplist:
+                # 逐个单位分析，转换成二元tuple
                 tmpi = i.split(':')
                 if '-' in tmpi[0]:
                     tmprow = tmpi[0].split('-')
@@ -161,43 +177,54 @@ def _get_template(_str = None):
 # 从json文件或者__url中获取报名表
 def _get_members(filename):
     try:
-        file = open(filename)
+        file = open(filename, 'r')
+        jdict = json.load(file)
+        list = range(len(jdict['actions']))
     except IOError:
         print "打开文件失败，请检查文件路径、名字是否正确。"
         exit(1)
-    else:
-        thestring = file.readline()
-        list = thestring.replace('}','{').replace(',','{').replace('[','{')\
-                .replace(']','{').split('{')
-        allmember = []
-        for i in list:
-            if "text" in i:
-                tmp = i.lstrip('"text":"').rstrip('"')
-                thegroup = tmp.split()
-                seed = []
-                try:
-                    number = int(thegroup[1])
-                except ValueError:
-                    print '"',tmp,'"填写不符合要求，跳过统计。'
-                except IndexError:
-                    match = re.match(u'([^\d]+)(\d+)', tmp)
-                    if match is not None:
-                        for j in range(int(match.group(2))):
-                            seed.append(match.group(1))
-                        allmember.append(seed)
-                        print '"', tmp, '"填写不符合要求，计入统计，并鄙视一下。'
-                    else:
-                        print '"',tmp,'"填写不符合要求，跳过统计。'
+    except ValueError:
+        print "这可能不是个json文件。"
+        exit(1)
+    except KeyError:
+        print "可能json文件改变key值了"
+        exit(1)
+
+    allmember = []
+
+    for i in list:
+        try:
+            tmp = jdict['actions'][i]['data']['text']
+        except KeyError:
+            pass
+        except:
+            print "程序出错，在获取text的值时。"
+        else:
+            thegroup = tmp.split()
+            seed = []
+            try:
+                number = int(thegroup[1])
+            except ValueError:
+                print '"',tmp,'"填写不符合要求，跳过统计。'
+            except IndexError:
+                match = re.match(u'([^\d]+)(\d+)', tmp)
+                if match is not None:
+                    for j in range(int(match.group(2))):
+                        seed.append(match.group(1))
+                    allmember.append(seed)
+                    print '"', tmp, '"填写不符合要求，计入统计，并鄙视一下。'
                 else:
-                    try:
-                        int(thegroup[2])
-                    except:
-                        for k in range(number):
-                            seed.append(thegroup[0])
-                        allmember.append(seed)
-                    else:
-                        print '"',tmp,'"填写不符合要求，跳过统计。'
-        return allmember
+                    print '"',tmp,'"填写不符合要求，跳过统计。'
+            else:
+                try:
+                    int(thegroup[2])
+                except:
+                    for k in range(number):
+                        seed.append(thegroup[0])
+                    allmember.append(seed)
+                else:
+                    print '"',tmp,'"填写不符合要求，跳过统计。'
+    return allmember
 
 
 if __name__ == '__main__':
