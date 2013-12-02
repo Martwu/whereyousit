@@ -4,22 +4,49 @@
 #Create Date:	2013年05月09日 星期四 14时15分48秒
 #当天抽电影座位票
 
+
 import random
 import sys, os
-import re 
+import re
 import json
 
 
 # 将环境编码强制设定为utf-8
 reload(sys)
-sys.setdefaultencoding('utf8')  
+sys.setdefaultencoding('utf8')
 
+
+def push_error(str = None):
+    if str is not None:
+        print "[ERROR] " + str
+    exit(1)
+
+
+def push_info(str):
+    print "[INFO] " + str
+
+
+def push_warm(str):
+    print "[WARM] " + str
+
+
+def push_debug(str = None):
+    if str is not None:
+        print "[DEBUG] " + str
+    exit(1)
+
+def push_help(i = 0):
+    if i == 0:
+        print '[USAGE] seats.py /path/to/file seatslist'
+    print '        seatslist格式："排数:序号-序号 排数-排数:序号-序号 ……"'
+    exit(1)
 
 # 自搞一个小异常，主要是在函数 _make_seat_list 中用一下，用以提醒一下
 # 可能存在无法实现全部家属坐一起的情况，但是现在的处理还不是很好
 class JustError(Exception):
     def __init__(self):
         Exception.__init__(self, 'May not let all pairs sit together.')
+
 
 # 获取表达式string，返回None或者表达式list，列表元素tuple 
 def _get_expr(str = None):
@@ -31,8 +58,7 @@ def _get_expr(str = None):
         splited_list = []
         regex = re.compile('^\d+(\*\d+)?(\+\d+(\*\d+)?)*$')
         if regex.match(str) is None:
-            print "表达式不符合要求。例子：8*3+5"
-            exit(1)
+            push_help(1)
         else:
             # 加号分割单位
             splited_list = str.split('+')
@@ -59,8 +85,7 @@ def _get_expr_sturct(_str = None):
         splited_list = []
         regex = re.compile('^(\d+(-\d+)?:\d+(-\d+)? ?)+$')
         if regex.match(_str) is None:
-            print '表达式不符合要求。例子： 行号:序号-序号[空格]行号:……'
-            exit(1)
+            push_help(1)
         else:
             # 用空格分割单位
             tmplist = _str.split(' ')
@@ -80,8 +105,7 @@ def _get_expr_sturct(_str = None):
                 try:
                     assert row >= 1 and line >= 1
                 except AssertionError:
-                    print '序号要从小到大填写'
-                    exit(1)
+                    push_error("序号需要从小到大写。")
                 splited_list.append((line, row))
     return splited_list
 
@@ -99,8 +123,7 @@ def _make_seat_list(members, expr):
             except IndexError:
                 break
             except:
-                print 'Some ERROR in func "_make_seat"(1)'
-                exit(1)
+                push_debug("在函数 make_seat_list")
             else:
                 members_list = members_list + chosen
                 members_copy.remove(chosen)
@@ -114,11 +137,9 @@ def _make_seat_list(members, expr):
                     try:
                         chosen = random.choice(members_copy)
                     except IndexError:
-                        print '座位数多于人数，检查清楚。'
-                        exit(1)
+                        push_error("座位数多于人数，请检查。")
                     except:
-                        print 'Some ERROR in func "_make_seat"(2)'
-                        exit(1)
+                        push_debug("在函数 make_seats_list")
                     else:
                         if len(chosen) <= leftseats:
                             leftseats = leftseats - len(chosen)
@@ -129,8 +150,7 @@ def _make_seat_list(members, expr):
                             if retry > 60:
                                 raise JustError
     if len(members_copy) != 0:
-        print '人数多于座位数，检查清楚。'
-        exit(1)
+        push_error("人数多于座位数，请检查。")
     return members_list
 
 
@@ -141,8 +161,7 @@ def _get_template(_str = None):
         print_template = ''
         regex = re.compile('^(\d+(-\d+)?:\d+(-\d+)? ?)+$')
         if regex.match(_str) is None:
-            print '表达式不符合要求。例子： 行号:序号-序号[空格]行号:……'
-            exit(1)
+            push_help()
         else:
             tmplist = _str.split(' ')
             for i in tmplist:
@@ -176,82 +195,76 @@ def _get_template(_str = None):
 
 
 # 从json文件或者__url中获取报名表
-def _get_members(filename):
+def _get_members(FILENAME):
     try:
-        file = open(filename, 'r')
-        jdict = json.load(file)
-        list = range(len(jdict['actions']))
+        JDICT = json.load(open(FILENAME, 'r'))
+        CARDLIST = JDICT['actions']
     except IOError:
-        print "打开文件失败，请检查文件路径、名字是否正确。"
-        exit(1)
+        push_error('打开文件失败，请检查路径。')
     except ValueError:
-        print "这可能不是个json文件。"
-        exit(1)
+        push_error('无法识别的json文件。')
     except KeyError:
-        print "可能json文件改变key值了"
-        exit(1)
+        push_debug('json数据格式已改变。')
 
-    allmember = []
+    memberlist = []
+    numberall = 0
+    numberpair = 0
 
-    for i in list:
+    for i in range(len(CARDLIST)):
         try:
-            tmp = jdict['actions'][i]['data']['text']
+            text = CARDLIST[i]['data']['text']
         except KeyError:
-            pass
+            continue
         except:
-            print "程序出错，在获取text的值时。"
-        else:
-            thegroup = tmp.split()
-            seed = []
-            try:
-                number = int(thegroup[1])
-            except ValueError:
-                print '"',tmp,'"填写不符合要求，跳过统计。'
-            except IndexError:
-                match = re.match(u'([^\d]+)(\d+)', tmp)
-                if match is not None:
-                    for j in range(int(match.group(2))):
-                        seed.append(match.group(1))
-                    allmember.append(seed)
-                    print '"', tmp, '"填写不符合要求，计入统计，并鄙视一下。'
-                else:
-                    print '"',tmp,'"填写不符合要求，跳过统计。'
-            else:
-                try:
-                    int(thegroup[2])
-                except:
-                    for k in range(number):
-                        seed.append(thegroup[0])
-                    allmember.append(seed)
-                else:
-                    print '"',tmp,'"填写不符合要求，跳过统计。'
-    return allmember
+            push_debug('获取text时程序出错。')
 
+        text = "".join(text.split())
+
+        while text:
+            seed = []
+            match = re.match(u'([^\d]+)(\d+)', text)
+            pushedtext = match.group(0)
+            text = text.lstrip(pushedtext)
+            numberp = int(match.group(2))
+            for i in range(numberp):
+                seed.append(match.group(1))
+            memberlist.append(seed)
+            numberall += numberp
+            numberpair += numberp - 1
+
+    return memberlist, numberall, numberpair
 
 if __name__ == '__main__':
+
+    # allseats = "8:5-14 8:19-24 9:4-11 9:18-24 10:5-14 10:17-24"
+
     try:
-        allmembers = _get_members(sys.argv[1])
+        allmembers, numbersall, numberspair  = _get_members(sys.argv[1])
     except IndexError:
-        print '运行： seats.py jsonfile expr\nexpr模板： 行座位数*行数+……'
-        exit(1)
+        push_help()
     try:
         expr = _get_expr_sturct(sys.argv[2])
         seat = _get_template(sys.argv[2])
+        # expr = _get_expr_sturct(allseats)
+        # seat = _get_template(allseats)
     except IndexError:
-        print '运行： seats.py jsonfile expr\nexpr模板： 行座位数*行数+……'
-        exit(1)
-    retrytimes = 30
-    for i in range(retrytimes):
+        push_info('总报名人数：' + str(numbersall) + '人，家属人数：'\
+                + str(numberspair) +  '人。')
+        exit(0)
+
+    RETRYTIMES = 30
+
+    for i in range(RETRYTIMES):
         try:
             namelist = _make_seat_list(allmembers, expr)
         except JustError:
             pass
-            if i == retrytimes - 1:
-                print "多次重试找不到符合要求的座位分配，现是随机分配。"
+            if i == RETRYTIMES - 1:
+                push_warm("多次重试找不到符合要求的座位分配，现是随机分配。")
                 namelist = _make_seat_list(allmembers, None)
         else:
             break
     try:
         print seat.format(*namelist)
     except IndexError:
-        print '程序出错，需要调试。'
+        push_error("打印排队结果时出错。")
