@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # -*- coding:UTF8 -*-
-#File:			seatchose.py
-#Create Date:	2013年05月09日 星期四 14时15分48秒
-#当天抽电影座位票
-
+#抽电影座位票
 
 import random
 import sys, os
@@ -35,11 +32,13 @@ def push_debug(str = None):
         print "[DEBUG] " + str
     exit(1)
 
+
 def push_help(i = 0):
     if i == 0:
         print '[USAGE] seats.py /path/to/file seatslist'
     print '        seatslist格式："排数:序号-序号 排数-排数:序号-序号 ……"'
     exit(1)
+
 
 # 自搞一个小异常，主要是在函数 _make_seat_list 中用一下，用以提醒一下
 # 可能存在无法实现全部家属坐一起的情况，但是现在的处理还不是很好
@@ -233,6 +232,7 @@ def _get_members(FILENAME):
             numberpair += numberp - 1
 
     return memberlist, numberall, numberpair
+
 
 if __name__ == '__main__':
 
