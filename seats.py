@@ -2,10 +2,11 @@
 # -*- coding:UTF8 -*-
 #抽电影座位票
 
-import random
+from random import choice
 import sys, os
 import re
-import json
+from json import load as jsonfile
+from string import replace
 
 
 # 将环境编码强制设定为utf-8
@@ -27,16 +28,12 @@ def push_warm(str):
     print "[WARM] " + str
 
 
-def push_debug(str = None):
-    if str is not None:
-        print "[DEBUG] " + str
-    exit(1)
-
-
 def push_help(i = 0):
     if i == 0:
         print '[USAGE] seats.py /path/to/file seatslist'
-    print '        seatslist格式："排数:序号-序号 排数-排数:序号-序号 ……"'
+        print '        seatslist格式："排数:序号-序号 排数-排数:序号-序号 ……"'
+    else:
+        print '[USAGE] seatslist格式："排数:序号-序号 排数-排数:序号-序号 ……"'
     exit(1)
 
 
@@ -45,33 +42,6 @@ def push_help(i = 0):
 class JustError(Exception):
     def __init__(self):
         Exception.__init__(self, 'May not let all pairs sit together.')
-
-
-# 获取表达式string，返回None或者表达式list，列表元素tuple 
-def _get_expr(str = None):
-    if str is None:
-        # 如果传入为空，返回空，这很公平啊！
-        return None
-    else:
-        # 表达式用正则匹配，形如 8*3+5
-        splited_list = []
-        regex = re.compile('^\d+(\*\d+)?(\+\d+(\*\d+)?)*$')
-        if regex.match(str) is None:
-            push_help(1)
-        else:
-            # 加号分割单位
-            splited_list = str.split('+')
-            # 逐个单位，转换成 二元tuple，没有乘号的添加乘数1
-            lenoflist = len(splited_list)
-            for i in range(lenoflist):
-                tmpstr = splited_list.pop(0)
-                if '*' in tmpstr:
-                    tmplist = tmpstr.split('*')
-                    splited_list.append((int(tmplist[0]), int(tmplist[1])))
-                else:
-                    splited_list.append((int(tmpstr), 1))
-    # 在这返回就形如[(,),(,),..]的列表
-    return splited_list
 
 
 # 获取表达式string，返回None或者座位分布结构list，列表元素tuple 
@@ -118,11 +88,9 @@ def _make_seat_list(members, expr):
     if expr is None:
         while True:
             try:
-                chosen = random.choice(members_copy)
+                chosen = choice(members_copy)
             except IndexError:
                 break
-            except:
-                push_debug("在函数 make_seat_list")
             else:
                 members_list = members_list + chosen
                 members_copy.remove(chosen)
@@ -134,11 +102,9 @@ def _make_seat_list(members, expr):
                 leftseats = i[0]
                 while leftseats > 0:
                     try:
-                        chosen = random.choice(members_copy)
+                        chosen = choice(members_copy)
                     except IndexError:
                         push_error("座位数多于人数，请检查。")
-                    except:
-                        push_debug("在函数 make_seats_list")
                     else:
                         if len(chosen) <= leftseats:
                             leftseats = leftseats - len(chosen)
@@ -196,18 +162,19 @@ def _get_template(_str = None):
 # 从json文件或者__url中获取报名表
 def _get_members(FILENAME):
     try:
-        JDICT = json.load(open(FILENAME, 'r'))
+        JDICT = jsonfile(open(FILENAME, 'r'))
         CARDLIST = JDICT['actions']
     except IOError:
         push_error('打开文件失败，请检查路径。')
     except ValueError:
         push_error('无法识别的json文件。')
     except KeyError:
-        push_debug('json数据格式已改变。')
+        push_error('json数据格式已改变。')
 
     memberlist = []
     numberall = 0
-    numberpair = 0
+    Bnumberair = 0
+    nameslist = []
 
     for i in range(len(CARDLIST)):
         try:
@@ -215,23 +182,28 @@ def _get_members(FILENAME):
         except KeyError:
             continue
         except:
-            push_debug('获取text时程序出错。')
-
+            push_error('获取text时程序出错。')
         text = "".join(text.split())
-
         while text:
             seed = []
-            match = re.match(u'([^\d]+)(\d+)', text)
+            #一个字符串中逐个“名字 数量”匹配
+            match = re.match(u'([\u4e00-\u9fa5]+)([\d\+]*\d)', text)
             pushedtext = match.group(0)
-            text = text.lstrip(pushedtext)
-            numberp = int(match.group(2))
-            for i in range(numberp):
-                seed.append(match.group(1))
+            Bname = match.group(1)
+            #print Bname
+            Bnumber = eval(match.group(2))
+            #print Bnumber
+            text = replace(text, pushedtext, "", 1)
+            if Bname in nameslist:
+                continue
+            nameslist.append(Bname)
+            for i in range(Bnumber):
+                seed.append(Bname)
             memberlist.append(seed)
-            numberall += numberp
-            numberpair += numberp - 1
+            numberall += Bnumber
+            Bnumberair += Bnumber - 1
 
-    return memberlist, numberall, numberpair
+    return memberlist, numberall, Bnumberair, nameslist
 
 
 if __name__ == '__main__':
@@ -239,7 +211,7 @@ if __name__ == '__main__':
     # allseats = "8:5-14 8:19-24 9:4-11 9:18-24 10:5-14 10:17-24"
 
     try:
-        allmembers, numbersall, numberspair  = _get_members(sys.argv[1])
+        allmembers, numbersall, numberspair, nameslist  = _get_members(sys.argv[1])
     except IndexError:
         push_help()
     try:
@@ -248,7 +220,8 @@ if __name__ == '__main__':
         # expr = _get_expr_sturct(allseats)
         # seat = _get_template(allseats)
     except IndexError:
-        push_info('总报名人数：' + str(numbersall) + '人，家属人数：'\
+        push_info("报名的人：" + ', '.join(nameslist))
+        push_info('总报名人数：' + str(numbersall) + '人，其中包含家属人数：'\
                 + str(numberspair) +  '人。')
         exit(0)
 
