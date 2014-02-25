@@ -8,6 +8,14 @@ import re
 from json import load as jsonfile
 from string import replace
 
+def underline(s):
+    return "%s[4;2m%s%s[0m" %(chr(27), s, chr(27))
+
+def red2_i(s):
+    return "%s[31;2m%s%s[0m" %(chr(27), s, chr(27))
+
+def green3_i(s):
+    return "%s[32;2m%s%s[0m" %(chr(27), s, chr(27))
 
 # 将环境编码强制设定为utf-8
 reload(sys)
@@ -16,16 +24,16 @@ sys.setdefaultencoding('utf8')
 
 def push_error(str = None):
     if str is not None:
-        print "[ERROR] " + str
+        print red2_i("[ERROR] ") + str
     exit(1)
 
 
 def push_info(str):
-    print "[INFO] " + str
+    print green3_i("[INFO] ") + str
 
 
 def push_warm(str):
-    print "[WARM] " + str
+    print red2_i("[WARM] ") + str
 
 
 def push_help(i = 0):
@@ -193,12 +201,16 @@ def _get_members(FILENAME):
             #print Bname
             Bnumber = eval(match.group(2))
             #print Bnumber
+            # 这里删除被匹配的项
             text = replace(text, pushedtext, "", 1)
-            if Bname in nameslist:
-                continue
-            nameslist.append(Bname)
+            #if Bname in nameslist:
+                #continue
             for i in range(Bnumber):
                 seed.append(Bname)
+            # 给带了家属的人加上下划线
+            if Bnumber > 1:
+                Bname = underline(Bname)
+            nameslist.append(Bname)
             memberlist.append(seed)
             numberall += Bnumber
             Bnumberair += Bnumber - 1
